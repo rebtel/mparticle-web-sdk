@@ -45,10 +45,31 @@ export default function SessionManager(
                 self.endSession();
                 self.startNewSession();
             } else {
+                // Check if we have an identified user
+                const user = mpInstance.Identity.getCurrentUser()
+                let needToIdentity = false
+
+                if (user) {
+                    // Here, userIdentities could be an empty object. If that's
+                    // the AND identifyRequest has at least a customerid, we
+                    // will force the identify() call.
+                    const storedUserIdentities = user.getUserIdentities()?.userIdentities
+                    const hasStoredCustomerId = storedUserIdentities != null && typeof storedUserIdentities.customerid === "string"
+
+                    const identifyRequest = mpInstance._Store.SDKConfig.identifyRequest
+                    const identifyRequestHasCustomerId = identifyRequest != null && typeof identifyRequest.userIdentities.customerid === "string"
+
+                    if (!hasStoredCustomerId && identifyRequestHasCustomerId) {
+                        console.log("[mParticle] SessionManager.initialize", "forcing identify()")
+                        needToIdentity = true
+                    }
+                }
+
                 // https://go.mparticle.com/work/SQDSDKS-6045
                 const persistence: IPersistenceMinified = mpInstance._Persistence.getPersistence();
-                if (persistence && !persistence.cu) {
+                if (needToIdentity || (persistence && !persistence.cu)) {
                     // https://go.mparticle.com/work/SQDSDKS-6323
+                    console.log("[mParticle] SessionManager.initialize", {identifyRequest : JSON.stringify(mpInstance._Store.SDKConfig.identifyRequest)})
                     mpInstance.Identity.identify(
                         mpInstance._Store.SDKConfig.identifyRequest,
                         mpInstance._Store.SDKConfig.identityCallback
